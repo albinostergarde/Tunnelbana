@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tunnelbanetavla Åkeshov</title>
+    <style>
+        body {
+            background-color: black;
+            color: lime;
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            font-size: 5vw;
+            margin: 0;
+            padding: 20px;
+        }
+        #departures {
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Åkeshov → Stan</h1>
+    <div id="departures">Hämtar tider...</div>
+
+    <script>
+        async function fetchDepartures() {
+            try {
+                const response = await fetch('https://api.resrobot.se/v2/departureBoard?key=DIN_API_NYCKEL_HÄR&siteId=9307&direction=9105&timeSpan=60&format=json');
+                const data = await response.json();
+                
+                const departuresDiv = document.getElementById('departures');
+                departuresDiv.innerHTML = '';
+
+                const departures = data.Departure
+                    .filter(dep => dep.transportNumber.startsWith('1') || dep.transportNumber.startsWith('2')) // Bara tunnelbana
+                    .filter(dep => dep.direction.includes("Odenplan") || dep.direction.includes("T-Centralen") || dep.direction.includes("Farsta") || dep.direction.includes("Hagsätra") || dep.direction.includes("Skarpnäck")); // destinationer mot stan
+
+                departures.forEach((dep, index) => {
+                    const minutes = Math.round((new Date(dep.rtTime ? dep.rtDate + "T" + dep.rtTime : dep.time) - new Date()) / 60000);
+                    if (minutes >= 0) {
+                        const elem = document.createElement('div');
+                        elem.innerText = `Om ${minutes} min → ${dep.direction}`;
+                        departuresDiv.appendChild(elem);
+                    }
+                });
+
+            } catch (error) {
+                document.getElementById('departures').innerText = 'Kunde inte hämta tider.';
+                console.error(error);
+            }
+        }
+
+        fetchDepartures();
+        setInterval(fetchDepartures, 30000); // Uppdatera var 30 sekund
+    </script>
+</body>
+</html>
