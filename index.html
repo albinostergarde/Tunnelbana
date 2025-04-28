@@ -7,44 +7,73 @@
     <style>
         body {
             background-color: black;
-            color: lime;
-            font-family: 'Arial', sans-serif;
-            text-align: center;
-            font-size: 5vw;
+            color: orange;
+            font-family: 'Courier New', Courier, monospace;
+            text-align: left;
+            padding: 30px;
             margin: 0;
-            padding: 20px;
+            overflow: hidden;
+        }
+        .main-departure {
+            font-size: 12vw;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+        .small-departure {
+            font-size: 6vw;
+            margin-top: 20px;
+            letter-spacing: 1px;
         }
         #departures {
-            margin-top: 50px;
+            margin-top: 40px;
         }
     </style>
 </head>
 <body>
-    <h1>Åkeshov → Stan</h1>
     <div id="departures">Hämtar tider...</div>
 
     <script>
+        const API_KEY = 'b624a5b1-2978-4590-8008-debaaebf33a2'; // Din riktiga nyckel
+        const proxyUrl = 'https://corsproxy.io/?';
+        const apiUrl = `https://api.resrobot.se/v2/departureBoard?key=${API_KEY}&siteId=9307&direction=9105&timeSpan=60&format=json`;
+
         async function fetchDepartures() {
             try {
-                const response = await fetch('https://api.resrobot.se/v2/departureBoard?key=b624a5b1-2978-4590-8008-debaaebf33a2&siteId=9307&direction=9105&timeSpan=60&format=json');
+                const response = await fetch(proxyUrl + encodeURIComponent(apiUrl));
                 const data = await response.json();
-                
+
                 const departuresDiv = document.getElementById('departures');
                 departuresDiv.innerHTML = '';
 
                 const departures = data.Departure
-                    .filter(dep => dep.transportNumber.startsWith('1') || dep.transportNumber.startsWith('2')) // Bara tunnelbana
-                    .filter(dep => dep.direction.includes("Odenplan") || dep.direction.includes("T-Centralen") || dep.direction.includes("Farsta") || dep.direction.includes("Hagsätra") || dep.direction.includes("Skarpnäck")); // destinationer mot stan
+                    .filter(dep => dep.transportNumber.startsWith('1') || dep.transportNumber.startsWith('2')) // Endast tunnelbana
+                    .filter(dep => dep.direction.includes("Odenplan") || dep.direction.includes("T-Centralen") || dep.direction.includes("Farsta") || dep.direction.includes("Hagsätra") || dep.direction.includes("Skarpnäck")); // In mot stan
 
-                departures.forEach((dep, index) => {
-                    const minutes = Math.round((new Date(dep.rtTime ? dep.rtDate + "T" + dep.rtTime : dep.time) - new Date()) / 60000);
-                    if (minutes >= 0) {
-                        const elem = document.createElement('div');
-                        elem.innerText = `Om ${minutes} min → ${dep.direction}`;
-                        departuresDiv.appendChild(elem);
+                if (departures.length > 0) {
+                    // Största, första avgången
+                    const firstDep = departures[0];
+                    const departureTime = new Date(firstDep.rtTime ? firstDep.rtDate + "T" + firstDep.rtTime : firstDep.date + "T" + firstDep.time);
+                    const minutes = Math.round((departureTime - new Date()) / 60000);
+
+                    const firstLine = document.createElement('div');
+                    firstLine.className = 'main-departure';
+                    firstLine.innerText = `${firstDep.direction.padEnd(15, ' ')}${minutes} min`;
+                    departuresDiv.appendChild(firstLine);
+
+                    // Två mindre avgångar efter
+                    for (let i = 1; i <= 2 && i < departures.length; i++) {
+                        const dep = departures[i];
+                        const time = new Date(dep.rtTime ? dep.rtDate + "T" + dep.rtTime : dep.date + "T" + dep.time);
+                        const mins = Math.round((time - new Date()) / 60000);
+
+                        const smallLine = document.createElement('div');
+                        smallLine.className = 'small-departure';
+                        smallLine.innerText = `${dep.direction.padEnd(15, ' ')}${mins} min`;
+                        departuresDiv.appendChild(smallLine);
                     }
-                });
-
+                } else {
+                    departuresDiv.innerText = 'Inga avgångar.';
+                }
             } catch (error) {
                 document.getElementById('departures').innerText = 'Kunde inte hämta tider.';
                 console.error(error);
@@ -52,7 +81,7 @@
         }
 
         fetchDepartures();
-        setInterval(fetchDepartures, 30000); // Uppdatera var 30 sekund
+        setInterval(fetchDepartures, 30000); // Uppdatera var 30:e sekund
     </script>
 </body>
 </html>
