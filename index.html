@@ -33,42 +33,52 @@
     <div id="departures">Hämtar tider...</div>
 
     <script>
-        const API_KEY = 'b624a5b1-2978-4590-8008-debaaebf33a2'; // Din riktiga nyckel
         const proxyUrl = 'https://corsproxy.io/?';
-        const apiUrl = `https://api.resrobot.se/v2/departureBoard?key=${API_KEY}&siteId=9307&direction=9105&timeSpan=60&format=json`;
+        const slUrl = 'https://transport.integration.sl.se/v1/sites/9307/departures';
 
         async function fetchDepartures() {
             try {
-                const response = await fetch(proxyUrl + encodeURIComponent(apiUrl));
+                const response = await fetch(proxyUrl + encodeURIComponent(slUrl), {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0'
+                    }
+                });
                 const data = await response.json();
 
                 const departuresDiv = document.getElementById('departures');
                 departuresDiv.innerHTML = '';
 
-                const departures = data.Departure
-                    .filter(dep => dep.transportNumber.startsWith('1') || dep.transportNumber.startsWith('2')) // Endast tunnelbana
-                    .filter(dep => dep.direction.includes("Odenplan") || dep.direction.includes("T-Centralen") || dep.direction.includes("Farsta") || dep.direction.includes("Hagsätra") || dep.direction.includes("Skarpnäck")); // In mot stan
+                const now = new Date();
 
-                if (departures.length > 0) {
-                    // Största, första avgången
-                    const firstDep = departures[0];
-                    const departureTime = new Date(firstDep.rtTime ? firstDep.rtDate + "T" + firstDep.rtTime : firstDep.date + "T" + firstDep.time);
-                    const minutes = Math.round((departureTime - new Date()) / 60000);
+                // Välj bara tunnelbanan (Subway) och avgångar in mot stan
+                const subwayDepartures = data.departures
+                    .filter(dep => dep.transportMode === "metro")
+                    .filter(dep => dep.line.includes("17") || dep.line.includes("18") || dep.line.includes("19")) // gröna linjen
+                    .filter(dep => {
+                        const direction = dep.destination.toLowerCase();
+                        return direction.includes("t-centralen") || direction.includes("odenplan") || direction.includes("hagsätra") || direction.includes("farsta") || direction.includes("skarpnäck") || direction.includes("gullmarsplan");
+                    });
+
+                if (subwayDepartures.length > 0) {
+                    // Första avgången (störst)
+                    const firstDep = subwayDepartures[0];
+                    const depTime = new Date(firstDep.expectedDepartureTime);
+                    const minutes = Math.round((depTime - now) / 60000);
 
                     const firstLine = document.createElement('div');
                     firstLine.className = 'main-departure';
-                    firstLine.innerText = `${firstDep.direction.padEnd(15, ' ')}${minutes} min`;
+                    firstLine.innerText = `${firstDep.destination.padEnd(15, ' ')}${minutes} min`;
                     departuresDiv.appendChild(firstLine);
 
                     // Två mindre avgångar efter
-                    for (let i = 1; i <= 2 && i < departures.length; i++) {
-                        const dep = departures[i];
-                        const time = new Date(dep.rtTime ? dep.rtDate + "T" + dep.rtTime : dep.date + "T" + dep.time);
-                        const mins = Math.round((time - new Date()) / 60000);
+                    for (let i = 1; i <= 2 && i < subwayDepartures.length; i++) {
+                        const dep = subwayDepartures[i];
+                        const time = new Date(dep.expectedDepartureTime);
+                        const mins = Math.round((time - now) / 60000);
 
                         const smallLine = document.createElement('div');
                         smallLine.className = 'small-departure';
-                        smallLine.innerText = `${dep.direction.padEnd(15, ' ')}${mins} min`;
+                        smallLine.innerText = `${dep.destination.padEnd(15, ' ')}${mins} min`;
                         departuresDiv.appendChild(smallLine);
                     }
                 } else {
